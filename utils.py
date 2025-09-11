@@ -1,4 +1,29 @@
 import datetime
+import json
+
+def flatten_dict(d, parent_key='', sep='_'):
+    '''
+    Flatten a nested dictionary.
+    
+    Args:
+        d (dict): Dictionary to flatten
+        parent_key (str): Key prefix for nested items
+        sep (str): Separator between parent and child keys
+    
+    Returns:
+        dict: Flattened dictionary
+    '''
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        elif isinstance(v, list):
+            # Store lists as JSON strings
+            items.append((new_key, json.dumps(v)))
+        else:
+            items.append((new_key, v))
+    return dict(items)
 
 def dict_to_schema(d):
     '''

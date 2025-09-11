@@ -9,7 +9,7 @@ import db_utils
 PROJECT_NAME = ""
 
 
-class ProjectManager:3
+class ProjectManager:
     """Manages experiment registry and database coordination for a project"""
     
     def __init__(self, project_name: str):

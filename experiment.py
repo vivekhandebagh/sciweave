@@ -7,17 +7,40 @@ import utils
 import db_utils
 from project_manager import ProjectManager
 
+# Try to import OmegaConf for Hydra support
+try:
+    from omegaconf import DictConfig, OmegaConf
+    HYDRA_AVAILABLE = True
+except ImportError:
+    HYDRA_AVAILABLE = False
+
 class Experiment(ABC):
 
-    def __init__(self, pm: ProjectManager, experiment_name: str, config: dict, mode: str='dev', result_path: str=None):
+    def __init__(self, pm: ProjectManager, experiment_name: str, config, mode: str='dev', result_path: str=None):
         
         
         self.pm = pm
         self.conn = self.pm.get_connection()
         self.cursor = self.conn.cursor()
         self.experiment_name = experiment_name
-        self.config = config
         self.mode = mode # mode must be either 'dev' or 'prod'
+        
+        # Convert DictConfig to plain dict if needed
+        if HYDRA_AVAILABLE and isinstance(config, DictConfig):
+            # Store original for use in run() method
+            self.original_config = config
+            # Convert to plain dict
+            plain_dict = OmegaConf.to_container(config, resolve=True)
+            # Flatten for database storage
+            self.config = utils.flatten_dict(plain_dict)
+        else:
+            self.original_config = config
+            # Check if it's a nested dict that needs flattening
+            if any(isinstance(v, dict) for v in config.values()):
+                self.config = utils.flatten_dict(config)
+            else:
+                self.config = config
+
         self.experiment_schema = utils.dict_to_schema(self.config)
 
         # set default result_path to results/timestamp/
