@@ -5,14 +5,8 @@ import uuid
 import json
 import utils
 import db_utils
+import schema_manager as sm
 from project_manager import ProjectManager
-
-# Try to import OmegaConf for Hydra support
-try:
-    from omegaconf import DictConfig, OmegaConf
-    HYDRA_AVAILABLE = True
-except ImportError:
-    HYDRA_AVAILABLE = False
 
 class Experiment(ABC):
 
@@ -25,23 +19,11 @@ class Experiment(ABC):
         self.experiment_name = experiment_name
         self.mode = mode # mode must be either 'dev' or 'prod'
         
-        # Convert DictConfig to plain dict if needed
-        if HYDRA_AVAILABLE and isinstance(config, DictConfig):
-            # Store original for use in run() method
-            self.original_config = config
-            # Convert to plain dict
-            plain_dict = OmegaConf.to_container(config, resolve=True)
-            # Flatten for database storage
-            self.config = utils.flatten_dict(plain_dict)
-        else:
-            self.original_config = config
-            # Check if it's a nested dict that needs flattening
-            if any(isinstance(v, dict) for v in config.values()):
-                self.config = utils.flatten_dict(config)
-            else:
-                self.config = config
-
-        self.experiment_schema = utils.dict_to_schema(self.config)
+        # Store original config for use in run() method
+        self.original_config = config
+        
+        # Process config through schema manager
+        self.config, self.experiment_schema = sm.prepare_config_for_storage(config)
 
         # set default result_path to results/timestamp/
         self.result_path = result_path
@@ -180,7 +162,7 @@ class Experiment(ABC):
                 return
             
             # First ensure all result columns exist
-            result_schema = utils.dict_to_schema(results)
+            result_schema = sm.infer_schema(results)
             db_utils.ensure_columns_exist(self.conn, self.experiment_id, result_schema)
             
             # Build UPDATE statement for results

@@ -27,6 +27,7 @@
 - [ ] Store directory pointer in database
 
 ## 3. API Improvements
+- [ ] Organize better. What should go in Project Manager, Utils, etc.
 - [ ] Create `__init__.py` to enable `import rex`
 - [ ] Clean up API to match README vision
 - [ ] Add cross-experiment query functionality
