@@ -6,14 +6,6 @@ Handles schema inference, evolution, and config-to-database interface.
 import json
 from typing import Dict, Any, List, Tuple, Optional
 
-# Try to import OmegaConf for Hydra support
-try:
-    from omegaconf import DictConfig, OmegaConf
-    HYDRA_AVAILABLE = True
-except ImportError:
-    HYDRA_AVAILABLE = False
-
-
 # ============================================================================
 # Config Processing Functions
 # ============================================================================
@@ -28,9 +20,15 @@ def process_config(config: Any) -> Dict[str, Any]:
     Returns:
         Flat dictionary with database-compatible values
     """
-    # Handle Hydra DictConfig
-    if HYDRA_AVAILABLE and isinstance(config, DictConfig):
+    # Check if it's a DictConfig (from Hydra/OmegaConf)
+    if hasattr(config, '__class__') and config.__class__.__name__ == 'DictConfig':
+        # Convert to regular dict - OmegaConf must be available if user is passing DictConfig
+        from omegaconf import OmegaConf
         config = OmegaConf.to_container(config, resolve=True)
+    
+    # Ensure we have a dict at this point
+    if not isinstance(config, dict):
+        raise TypeError(f"Config must be a dictionary or DictConfig, got {type(config)}")
     
     # Flatten if nested
     if is_nested(config):

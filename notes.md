@@ -44,45 +44,68 @@ As the human researcher, you are responsible for maintaining the long term visio
 - if a column in your results is numerical, be able to easily get mean, variance, and other statistics
 
 
-# Implementation Notes:
-Example codebase:
+# WORKFLOW:
 
-'''
-project-name/
-    init_research.py
-    visualization_defaults.py
-    train-experiments/
-        experiment1-name/
-            experiment_script.py   
-        experiment2-name/
-    analysis-experiments/
-        experiment3-name/
-        experiment4-name/
-'''
 
-init_research:
-- will initiate the project database. 
-- define an experiment class that sets up the table creation routines, default/required schema, and config.
-- will need an experiment.config object that will be a dictionary/yaml that will dynamically link to the experiment schema.
+```
+import rex
+from rex import ProjectManager
+import hydra
+from omegaconf import DictConfig
+# initialize/activate project manager (which is essentially anchored to a project_name.db file)
+pm = ProjectManager(project_name)
 
-Experiment class:
+# define your experiment logic
+class MyExperiment(rex.Experiment):
+    def __init__(self):
+        pass
+
+    def run(self):
+        # experiment logic
+        return results
+
+# set your config (either as a dictionary or through Hydra)
+@hydra.main(config_path="conf", config_name="config")
+def main(cfg: DictConfig):
+    exp = MyExperiment(pm="sqlite", name=cfg.experiment.name, config=cfg)
+    results = exp()
+```
+
+
+STACK:
+Hydra (configuration management)
+Experiment (defined by a config, experiment logic in run(), results)
+Interface/schema manager (handles evolving experiments, formatting configs/results, etc.)
+Project Manager (database of experiments.)
+
+
+EXPERIMENT CLASS:
 - this will be an abstract class
-- when we want to create a new experiment, we can create an experiment that subclasses Experiment. whatever they want for the experiment to run should be defined in the run() abstract method.
-- Experiment.__call__() will run all boilerplate code like creating the table, generating run_ids, etc.
-- when an experiment is created, it needs to maintain a pointer to the table corresponding to that experiment. this way even if the experiment name is changed or evolves, we still use the same table. or if we spin up multiple instances of the same experiment in parallel, it will write to the same table.
-- if run fails, results wont be generated. but the database should still be updated with the pre-results schema and then run status should be updated correctly as "failed" or "interrupted"
+- when we want to create a new experiment, we can create an experiment that subclasses Experiment. 
+- whatever they want for the experiment to run should be defined in the run() abstract method.
+- Experiment.__call__() will run all boilerplate code that deals with updating all information to the database before and after calling self.run()
+- when an experiment is created, it needs to be updated to the database's experiment registry and maintained there. 
 
-result management:
-- database will store a pointer to the directory where the results are stored
-- all the results you want on the database will be compiled into a dictionary/JSON
+
+RESULT MANAGEMENT:
+- database will store a pointer to the directory where all results of a particular run are stored
+- all the results you want on the database should be compiled into a dictionary/JSON
 - only these results will be added or updated as columns in the table.
-- but otherwise, you can store checkpoints, plots, samples, etc. in the exeriment_name/results/time_stamp/ folder
+- but otherwise, all results of a run will be stored in a local folder. 
+- but otherwise, you can store checkpoints, plots, samples, etc. in the exeriment_name/results/time_stamp/folder
 
-experiment_script:
-- the experiment script will create the new experiment object
-- set the experiment configuration
-- define the actual experiment flow and code that produces results
 
-helper functions that mask basic SQL queries:
-- get_results(run_id)
-- a run_id() function that returns list of run_ids of a particular timestamp, or corresponding to a time interval, or other filter parameters
+SCHEMA MANAGER/UTILS(this doesn't necessarily have to be a separate class or file. it could just be an aspect of project manager):
+- helper functions that mask wrap/mask SQL queries
+- converting and formatting Experiment configs for database (Hydra is something the user may or may not use. Deal with configs that are purely standard dictionaries or are omegaconf.DictConfigs.)
+- identifying when and how experiment evolves, making sure that is reflected in the database schema updates
+    - simple column update
+    - reset experiment database
+    - create versioning?
+
+
+PROJECT MANAGER:
+- is basically the project's .db file
+- maintains the experiment registry
+- query your experiments
+- query across your experiments

@@ -11,9 +11,9 @@
 
 
 ### Config to Database Interface
-- [ ] create a blank interface layer that will handle validation, handles formatting, handles formatting.
+- [x] create a blank interface layer that will handle validation, handles formatting, handles formatting.
 - [x] if config is heirarchical, it needs to be flattened for schema
-- [ ] identify how config/schema evolves
+- [x] identify how config/schema evolves
 
 ### Archive/Reset Functions
 - [ ] Add `pm.reset_experiment(name)` - creates fresh table, archives old
@@ -27,7 +27,7 @@
 - [ ] Store directory pointer in database
 
 ## 3. API Improvements
-- [ ] Organize better. What should go in Project Manager, Utils, etc.
+- [x] Organize better. What should go in Project Manager, Utils, etc.
 - [ ] Create `__init__.py` to enable `import rex`
 - [ ] Clean up API to match README vision
 - [ ] Add cross-experiment query functionality
