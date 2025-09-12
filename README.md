@@ -1,12 +1,22 @@
 # SciWeave
 
-A lightweight, flexible experiment tracking framework for machine learning research. SciWeave automatically captures experiment configurations and results in a local SQLite database, making it easy to track, query, and compare numerical scientific experiments without external dependencies or a complex setup.
+A lightweight, flexible experiment tracking framework for general numerical research. SciWeave automatically captures experiment configurations and results in a local SQLite database, making it easy to track, query, and compare numerical scientific experiments without external dependencies or a complex setup.
 
-## 🎯 Problem It Solves
+## Key Features
 
-Many researchers in Physics, Mathematics, Computational Biology, Economics, and even Machine Learning, need to develop and run a range of computational experiments. A majority of researchers or students in these fields don't have a strong background in computer science or software engineering from the systems level perspective. Usually, one gets excited about a project and jumps straight into the mathematization of their problem and start implementing their experiment logic.
+- **Simple Integration**: Subclass `Experiment`, implement `run()`, and you're done
+- **Automatic Tracking**: Configs and results automatically saved to SQLite database
+- **Powerful Queries**: Query by config values, time ranges, tags, or any custom field
+- **Schema Evolution**: Automatically adapts to new config parameters and result fields
+- **Flexible Tagging**: Tag and annotate runs for easy organization
+- **Hydra Compatible**: Works seamlessly with Hydra configs or plain Python dicts
+- **Local Storage**: No external dependencies, servers, or accounts needed
+- **Fast & Lightweight**: Pure Python with SQLite backend
 
-The typical workflow involves writing ad-hoc Python scripts, running them with different parameters manually edited in the code or passed through command-line arguments, and saving results to variously named CSV files or folders. After weeks of exploration, researchers often find themselves with directories full of `experiment_v2_final_FINAL_actually_final.py` scripts and results scattered across `results_020124/`, `test_runs_new/`, and `backup_dont_delete/` folders. When it comes time to write up findings or revisit what worked, they're left grep-ing through code and opening dozens of files trying to remember which configuration produced that one promising result from three weeks ago.
+
+## What is wrong?
+
+Many researchers/students in technical or scientific fields need to develop and run a range of computational experiments. Many may not have a strong background in engineering software systems. The typical workflow involves writing ad-hoc Python scripts, running them with different parameters manually edited in the code or passed through command-line arguments, and saving results to variously named CSV files or folders. After weeks of exploration, researchers often find themselves with directories full of `experiment_v2_final_FINAL_actually_final.py` scripts and results scattered across `results_020124/`, `test_runs_new/`, and `backup_dont_delete/` folders. When it comes time to write up findings or revisit what worked, they're left grep-ing through code and opening dozens of files trying to remember which configuration produced that one promising result from three weeks ago.
 
 This ad-hoc approach leads scientific researchers to struggle with:
 - Forgetting which hyperparameters produced which results
@@ -16,32 +26,23 @@ This ad-hoc approach leads scientific researchers to struggle with:
 - Existing solutions for experiment tracking require complex setup and are not that flexible
 - Forgetting which runs had the most important results or properties
 
+
+## What does SciWeave do?
 SciWeave solves these problems with a simple, local-first approach that grows with your research.
 
-## 💡 How SciWeave Solves This
+SciWeave automatically creates and maintains a SQLite database for your entire project, where every experiment run is captured with its complete configuration and results. Instead of scattered files, you get an organized system that you can query with simple Python commands. Want to find all runs where accuracy exceeded 0.9? One line of code. Need to compare results across different learning rates? Simple filter. Looking for that experiment from last Tuesday with the specific parameter combination? It's all there, instantly searchable. You don't need to know SQL as SciWeave provides an intuitive Python API where you can filter by any parameter, query by time ranges, or retrieve results based on performance metrics.
 
-SciWeave automatically creates and maintains a SQLite database for your entire project, where every experiment run is captured with its complete configuration and results. Instead of scattered files, you get a single source of truth that you can query with simple Python commands. Want to find all runs where accuracy exceeded 0.9? One line of code. Need to compare results across different learning rates? Simple filter. Looking for that experiment from last Tuesday with the specific parameter combination? It's all there, instantly searchable. You don't need to know SQL as SciWeave provides an intuitive Python API where you can filter by any parameter, query by time ranges, or retrieve results based on performance metrics.
-
-The power of this approach becomes clear when you realize that your experiments naturally form a structured dataset. Each run is a row, each configuration parameter and result metric is a column, and suddenly your months of experimental work become as queryable as any database. But unlike traditional databases that require rigid schemas defined upfront, SciWeave adapts dynamically—adding new columns automatically when you introduce new parameters or metrics. This design philosophy acknowledges that research is exploratory: you don't know all the parameters you'll need when you start, and you shouldn't be constrained by initial decisions. The database grows with your understanding, maintaining a complete history while remaining flexible for future evolution.
-
-## 🧪 What is an Experiment?
+## What is an Experiment?
 
 At its core, any computational experiment—whether simulating particle interactions, optimizing portfolio allocations, or training neural networks—consists of three fundamental components. First, there's the **experimental logic**: the actual algorithmic steps, calculations, and procedures that test your hypothesis. Second, there's the **experimental conditions**: the parameters, configurations, and hyperparameters that define the specific context under which your experiment runs. Third, there's the **empirical results**: the measurements, metrics, and outcomes that your experiment produces.
 
-SciWeave's design philosophy directly maps to this trinity. Your experimental logic lives in an `Experiment` subclass where you implement the `run()` method with your scientific procedure. The experimental conditions are captured as a configuration dictionary—whether hand-crafted, generated programmatically, or managed through tools like Hydra—that gets automatically tracked and made queryable. The results you return from your experiment are automatically stored and schema-managed, allowing you to add new metrics as your research evolves without breaking anything. This separation of concerns means you focus on the science while SciWeave handles the bookkeeping, ensuring every run is recorded with its full context and outcomes.
+SciWeave's design philosophy directly maps to this trinity. Your experimental logic lives in an `Experiment` subclass where you implement the `run()` method with your scientific procedure. The experimental conditions are captured as a configuration dictionary that gets automatically tracked and made queryable. The results that you return as in the dictionary/JSON format will also get tracked and made queryable.
 
-## ✨ Key Features
+SciWeave acknowledges that research is exploratory and adapts dynamically—adding new columns automatically when you introduce new parameters or metrics. 
 
-- **🔌 Simple Integration**: Subclass `Experiment`, implement `run()`, and you're done
-- **📊 Automatic Tracking**: Configs and results automatically saved to SQLite database
-- **🔍 Powerful Queries**: Query by config values, time ranges, tags, or any custom field
-- **📈 Schema Evolution**: Automatically adapts to new config parameters and result fields
-- **🏷️ Flexible Tagging**: Tag and annotate runs for easy organization
-- **🔗 Hydra Compatible**: Works seamlessly with Hydra configs or plain Python dicts
-- **💾 Local Storage**: No external dependencies, servers, or accounts needed
-- **🚀 Fast & Lightweight**: Pure Python with SQLite backend
+This separation of concerns means you focus on the science while SciWeave handles the bookkeeping, ensuring every run is recorded with its full context and outcomes.
 
-## 📦 Installation
+## Installation
 
 ```bash
 # From TestPyPI (for now)
@@ -53,7 +54,7 @@ cd sciweave
 pip install -e .
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Basic Usage
 
