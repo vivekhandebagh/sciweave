@@ -6,4 +6,4 @@ def time_stamp():
 
 # Legacy imports for backward compatibility
 # TODO: Update all usages to import from schema_manager directly
-from schema_manager import flatten_dict, infer_schema as dict_to_schema
+from .schema_manager import flatten_dict, infer_schema as dict_to_schema

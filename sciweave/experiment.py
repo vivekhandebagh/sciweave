@@ -3,10 +3,10 @@ from abc import ABC, abstractmethod
 import datetime
 import uuid
 import json
-import utils
-import db_utils
-import schema_manager as sm
-from project_manager import ProjectManager
+from . import utils
+from . import db_utils
+from . import schema_manager as sm
+from .project_manager import ProjectManager
 
 class Experiment(ABC):
 

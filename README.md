@@ -45,11 +45,10 @@ This separation of concerns means you focus on the science while SciWeave handle
 ## Installation
 
 ```bash
-# From TestPyPI (for now)
-pip install -i https://test.pypi.org/simple/ sciweave
+pip install sciweave
 
 # Or install from source
-git clone https://github.com/yourusername/sciweave.git
+git clone https://github.com/vivekhandebagh/sciweave.git
 cd sciweave
 pip install -e .
 ```
@@ -202,7 +201,7 @@ MIT License - see LICENSE file
 
 ## 🚧 Status
 
-This is an early release (v0.0.1). The API may change in future versions. We recommend pinning your version for production use.
+This is an early release (v0.1.0). The API may change in future versions. We recommend pinning your version for production use.
 
 ## 🔮 Roadmap
 
@@ -215,8 +214,8 @@ This is an early release (v0.0.1). The API may change in future versions. We rec
 
 ## 💬 Support
 
-- Issues: [GitHub Issues](https://github.com/yourusername/sciweave/issues)
-- Discussions: [GitHub Discussions](https://github.com/yourusername/sciweave/discussions)
+- Issues: [GitHub Issues](https://github.com/vivekhandebagh/sciweave/issues)
+- Discussions: [GitHub Discussions](https://github.com/vivekhandebagh/sciweave/discussions)
 
 ---
 
