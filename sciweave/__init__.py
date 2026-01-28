@@ -1,12 +1,13 @@
 """
-SciWeave - Lightweight experiment tracking for scientific research.
+SciWeave - Structured experiment scaffolding for ML research teams.
 
-A flexible framework that automatically captures experiment configurations
-and results in a local SQLite database.
+A lightweight framework that provides structure for experiments
+and logs directly to MLflow/Databricks.
 """
 
-from sciweave.project_manager import ProjectManager
+from sciweave.project import Project
 from sciweave.experiment import Experiment
+from sciweave.config import flatten_config
 
-__version__ = "0.1.0"
-__all__ = ["ProjectManager", "Experiment"]
+__version__ = "0.2.0"
+__all__ = ["Project", "Experiment", "flatten_config"]

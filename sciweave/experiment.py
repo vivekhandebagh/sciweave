@@ -1,242 +1,217 @@
-import sqlite3
+"""Experiment base class for SciWeave - structured experiment scaffolding."""
+
+import mlflow
 from abc import ABC, abstractmethod
-import datetime
-import uuid
-import json
-from . import utils
-from . import db_utils
-from . import schema_manager as sm
-from .project_manager import ProjectManager
+from typing import Any, Dict, Optional, Union
+from pathlib import Path
+
+from .project import Project
+from .config import flatten_config
+
 
 class Experiment(ABC):
+    """
+    Base class for structured experiments.
 
-    def __init__(self, pm: ProjectManager, experiment_name: str, config, mode: str='dev', result_path: str=None):
-        
-        
-        self.pm = pm
-        self.conn = self.pm.get_connection()
-        self.cursor = self.conn.cursor()
-        self.experiment_name = experiment_name
-        self.mode = mode # mode must be either 'dev' or 'prod'
-        
-        # Store original config for use in run() method
-        self.original_config = config
-        
-        # Process config through schema manager
-        self.config, self.experiment_schema = sm.prepare_config_for_storage(config)
+    Subclass and implement run() to define your experiment.
+    Results returned from run() are automatically logged to MLflow.
 
-        # set default result_path to results/timestamp/
-        self.result_path = result_path
+    Example:
+        class MyExperiment(Experiment):
+            def run(self):
+                model = train_model(self.config)
+                return {"accuracy": evaluate(model)}
 
-        # This returns the experiment_id
-        self.experiment_id = pm.init_experiment(self.experiment_name, self.experiment_schema)
+        project = Project("my-project", tracking_uri="databricks")
+        exp = MyExperiment(project, "experiment_v1", {"lr": 0.01, "epochs": 100})
+        results = exp()  # Runs and logs to MLflow
+    """
 
-    def _generate_run_id(self):
-        '''Needs to automatically generate a unique run id.'''
-        short_uuid = str(uuid.uuid4())[:8]
-        return f"run_{short_uuid}"
-
-    def _update_table(self, phase: str, data: dict = None):
-        """Update experiment table in three phases:
-        1. pre_experiment: Insert row with required schema and run_status='started'
-        2. pre_results: Update row with config parameters and run_status='running' 
-        3. post_results: Update row with results and run_status='completed'/'failed'
+    def __init__(
+        self,
+        project: Project,
+        experiment_name: str,
+        config: Dict[str, Any],
+        run_name: Optional[str] = None,
+        tags: Optional[Dict[str, str]] = None,
+    ):
         """
-        if phase == 'pre_experiment':
-            # Insert initial row with required schema
-            required_data = {
-                'run_id': data['run_id'],
-                'time_stamp': data['time_stamp'], 
-                'experiment_name': self.experiment_name,
-                'mode': self.mode,
-                'run_status': 'started',
-                'result_path': data.get('result_path', '')
-            }
-            
-            columns = ', '.join(required_data.keys())
-            placeholders = ', '.join(['?' for _ in required_data])
-            values = list(required_data.values())
-            
-            sql = f"INSERT INTO {self.experiment_id} ({columns}) VALUES ({placeholders})"
-            self.cursor.execute(sql, values)
-            self.conn.commit()
-            
-        elif phase == 'pre_results':
-            # Update with config parameters
-            if data:
-                set_clauses = []
-                values = []
-                for key, value in data.items():
-                    set_clauses.append(f"{key} = ?")
-                    values.append(value)
-                
-                # Update run_status
-                set_clauses.append("run_status = ?")
-                values.append('running')
-                values.append(data['run_id'])  # for WHERE clause
-                
-                sql = f"UPDATE {self.experiment_id} SET {', '.join(set_clauses)} WHERE run_id = ?"
-                self.cursor.execute(sql, values)
-                self.conn.commit()
-                
-        elif phase == 'post_results':
-            # Update with results
-            if data:
-                set_clauses = []
-                values = []
-                for key, value in data.items():
-                    if key != 'run_id':  # Don't update run_id
-                        set_clauses.append(f"{key} = ?")
-                        values.append(value)
-                
-                # Update run_status based on success
-                run_status = data.get('run_status', 'completed')
-                set_clauses.append("run_status = ?")
-                values.append(run_status)
-                values.append(data['run_id'])  # for WHERE clause
-                
-                sql = f"UPDATE {self.experiment_id} SET {', '.join(set_clauses)} WHERE run_id = ?"
-                self.cursor.execute(sql, values)
-                self.conn.commit()
+        Initialize an experiment.
 
-    def _prerun_updates(self):
-        '''
-        Before we call self.run(), we need to generate run id and timestamp. the experiment name is already given. 
-        mode is also given. run status should default to 'started' then later modified to 'interrupted,' 'failed', or 'completed'
-        result path will remain null by default.
-        this completes the required schema
-
-        then we need to take the values of config and store it since the experiment schema will be your config anyways.
-        '''
-        
-        run_id = self._generate_run_id()
-        time_stamp = utils.time_stamp()
-
-        if self.result_path is None:
-            self.result_path = f'results/{time_stamp}'
-        
-        # Combine required data and config data into single INSERT
-        all_data = {
-            'run_id': run_id,
-            'time_stamp': time_stamp, 
-            'experiment_name': self.experiment_name,
-            'mode': self.mode,
-            'run_status': 'started',
-            'result_path': self.result_path,
-            'tags': '',  # Initialize empty
-            'notes': ''  # Initialize empty
-        }
-        
-        # Add config values
-        all_data.update(self.config)
-        
-        columns = ', '.join(all_data.keys())
-        placeholders = ', '.join(['?' for _ in all_data])
-        values = list(all_data.values())
-        
-        # Use quoted table name for safety
-        quoted_table = db_utils.quote_identifier(self.experiment_id)
-        sql = f"INSERT INTO {quoted_table} ({columns}) VALUES ({placeholders})"
-        self.cursor.execute(sql, values)
-        self.conn.commit()
-        
-        return run_id  # Return run_id for use in postrun_updates
-        
-    def _postrun_updates(self, run_id, results, status='completed'):
-        '''
-        Update the existing row with results and final status.
-        Dynamically adds columns if they don't exist.
-        
         Args:
-            run_id: The run_id of the row to update
-            results: Dictionary of results from self.run()
-            status: Final status ('completed', 'failed', 'interrupted')
-        '''
-        try:
-            if not results:
-                # Just update the status if no results
-                quoted_table = db_utils.quote_identifier(self.experiment_id)
-                sql = f"UPDATE {quoted_table} SET run_status = ? WHERE run_id = ?"
-                self.cursor.execute(sql, (status, run_id))
-                self.conn.commit()
-                return
-            
-            # First ensure all result columns exist
-            result_schema = sm.infer_schema(results)
-            db_utils.ensure_columns_exist(self.conn, self.experiment_id, result_schema)
-            
-            # Build UPDATE statement for results
-            set_clauses = []
-            values = []
-            
-            # Add each result field with proper quoting
-            for key, value in results.items():
-                sanitized_key = db_utils.sanitize_identifier(key)
-                quoted_key = db_utils.quote_identifier(sanitized_key)
-                set_clauses.append(f"{quoted_key} = ?")
-                values.append(value)
-            
-            # Add final status
-            set_clauses.append('"run_status" = ?')
-            values.append(status)
-            
-            # Add run_id for WHERE clause
-            values.append(run_id)
-            
-            # Execute UPDATE with quoted table name
-            quoted_table = db_utils.quote_identifier(self.experiment_id)
-            sql = f"UPDATE {quoted_table} SET {', '.join(set_clauses)} WHERE run_id = ?"
-            self.cursor.execute(sql, values)
-            self.conn.commit()
-            
-        except Exception as e:
-            # If update fails, try to save to backup
-            print(f"Failed to update results: {e}")
-            backup_data = {
-                'run_id': run_id,
-                'status': status,
-                'results': results,
-                'experiment_id': self.experiment_id,
-                'error': str(e)
-            }
-            db_utils.create_backup_json(backup_data)
-            raise
+            project: Project instance connected to MLflow
+            experiment_name: Name for this experiment (will be prefixed with project name)
+            config: Configuration dictionary (can be nested)
+            run_name: Optional name for this specific run
+            tags: Optional tags to attach to the run
+        """
+        self.project = project
+        self.experiment_name = experiment_name
+        self.config = config  # Original nested config for use in run()
+        self.run_name = run_name
+        self.tags = tags or {}
 
-    @db_utils.retry_on_lock(max_retries=3)
-    def __call__(self, *args, **kwds):
-        """Handle all the boilerplate code for experiment execution with error recovery"""
-        
-        run_id = None
+        # Flatten config for MLflow params
+        self._flat_config = flatten_config(config)
+
+        # Get/create MLflow experiment
+        self._experiment_id = project.get_or_create_experiment(experiment_name)
+
+        # Run state
+        self._active_run = None
+        self._run_id = None
+
+    def __call__(self) -> Dict[str, Any]:
+        """
+        Execute the experiment with full MLflow tracking.
+
+        Returns:
+            Results dictionary from run()
+        """
         try:
-            # Pre-run updates: insert row with required fields and config
-            run_id = self._prerun_updates()
-            
+            # Start MLflow run
+            mlflow.set_experiment(experiment_id=self._experiment_id)
+            self._active_run = mlflow.start_run(run_name=self.run_name)
+            self._run_id = self._active_run.info.run_id
+
+            # Log config as params
+            mlflow.log_params(self._flat_config)
+
+            # Log tags
+            for key, value in self.tags.items():
+                mlflow.set_tag(key, value)
+            mlflow.set_tag("status", "running")
+
             # Run the experiment
             results = self.run()
-            
-            # Post-run updates: update row with results and status
-            try:
-                self._postrun_updates(run_id, results, status='completed')
-            except Exception as update_error:
-                # If post-update fails, still return results (they're backed up)
-                print(f"Warning: Failed to save results to database: {update_error}")
-                print("Results have been backed up to JSON file")
-                # Don't re-raise - experiment succeeded, just DB write failed
-            
+
+            # Log results
+            if results:
+                for key, value in results.items():
+                    if isinstance(value, (int, float)):
+                        mlflow.log_metric(key, value)
+                    else:
+                        mlflow.set_tag(f"result.{key}", str(value))
+
+            mlflow.set_tag("status", "completed")
+            mlflow.end_run(status="FINISHED")
             return results
-            
+
         except Exception as e:
-            # Handle experiment failure
-            if run_id:
-                try:
-                    self._postrun_updates(run_id, None, status='failed')
-                except Exception as update_error:
-                    print(f"Warning: Failed to update failure status: {update_error}")
-            
-            # Always re-raise the original experiment exception
-            raise e
+            mlflow.set_tag("status", "failed")
+            mlflow.set_tag("error", str(e))
+            mlflow.end_run(status="FAILED")
+            raise
+
+        finally:
+            self._active_run = None
 
     @abstractmethod
-    def run(self):
-        # must return a dict containing the results that need to get stored in the database
+    def run(self) -> Dict[str, Any]:
+        """
+        Implement your experiment logic here.
+
+        Access config via self.config (original nested structure).
+        Use self.log_metric() for time-series metrics during training.
+        Use self.log_artifact() for files (models, plots, data).
+
+        Returns:
+            Dict of final results (automatically logged as metrics/tags)
+        """
         pass
+
+    def log_metric(
+        self, key: str, value: float, step: Optional[int] = None
+    ) -> None:
+        """
+        Log a metric during training.
+
+        Use this for time-series data like loss curves:
+            for epoch in range(100):
+                loss = train_epoch()
+                self.log_metric("loss", loss, step=epoch)
+
+        Args:
+            key: Metric name
+            value: Metric value (must be numeric)
+            step: Optional step number for time-series
+        """
+        mlflow.log_metric(key, value, step=step)
+
+    def log_metrics(
+        self, metrics: Dict[str, float], step: Optional[int] = None
+    ) -> None:
+        """
+        Log multiple metrics at once.
+
+        Args:
+            metrics: Dictionary of metric name -> value
+            step: Optional step number for time-series
+        """
+        mlflow.log_metrics(metrics, step=step)
+
+    def log_artifact(
+        self, local_path: Union[str, Path], artifact_path: Optional[str] = None
+    ) -> None:
+        """
+        Log a file artifact.
+
+        Args:
+            local_path: Path to the local file
+            artifact_path: Optional subdirectory in the artifact store
+        """
+        mlflow.log_artifact(str(local_path), artifact_path)
+
+    def log_artifacts(
+        self, local_dir: Union[str, Path], artifact_path: Optional[str] = None
+    ) -> None:
+        """
+        Log all files in a directory as artifacts.
+
+        Args:
+            local_dir: Path to local directory
+            artifact_path: Optional subdirectory in the artifact store
+        """
+        mlflow.log_artifacts(str(local_dir), artifact_path)
+
+    def log_figure(self, figure: Any, filename: str) -> None:
+        """
+        Log a matplotlib figure.
+
+        Args:
+            figure: Matplotlib figure object
+            filename: Filename for the figure (e.g., "loss_curve.png")
+        """
+        mlflow.log_figure(figure, filename)
+
+    def log_dict(self, dictionary: Dict[str, Any], filename: str) -> None:
+        """
+        Log a dictionary as a JSON or YAML artifact.
+
+        Args:
+            dictionary: Dictionary to log
+            filename: Filename (e.g., "config.json" or "results.yaml")
+        """
+        mlflow.log_dict(dictionary, filename)
+
+    def set_tag(self, key: str, value: str) -> None:
+        """
+        Set a tag on the current run.
+
+        Args:
+            key: Tag name
+            value: Tag value
+        """
+        mlflow.set_tag(key, value)
+
+    @property
+    def run_id(self) -> Optional[str]:
+        """Get the current run ID (available during run execution)."""
+        return self._run_id
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}("
+            f"experiment='{self.experiment_name}', "
+            f"config={self.config})"
+        )

@@ -1,222 +1,349 @@
 # SciWeave
 
-A lightweight, flexible experiment tracking framework for general numerical research. SciWeave automatically captures experiment configurations and results in a local SQLite database, making it easy to track, query, and compare numerical scientific experiments without external dependencies or a complex setup.
+Structured experiment scaffolding for ML research teams. SciWeave provides a clean, opinionated structure for experiments that logs directly to MLflow/Databricks.
+
+## The Problem
+
+The typical researcher workflow involves writing ad-hoc Python scripts, running them with different parameters manually edited in the code, and saving results to variously named CSV files or folders. After weeks of exploration, researchers find themselves with directories full of `experiment_v2_final_FINAL.py` scripts and results scattered across `results_020124/`, `test_runs_new/`, and `backup_dont_delete/`.
+
+When AI coding agents enter the picture, this gets worse. Without structure, agents produce the same ad-hoc mess—just faster.
+
+## The Solution
+
+SciWeave provides a simple scaffold: subclass `Experiment`, implement `run()`, return your results. Everything else—logging configs, tracking metrics, saving artifacts—is handled automatically to your team's MLflow/Databricks instance.
+
+```python
+from sciweave import Project, Experiment
+
+project = Project("my-research", tracking_uri="databricks")
+
+class MyExperiment(Experiment):
+    def run(self):
+        model = train_model(self.config)
+        return {"accuracy": 0.95, "loss": 0.05}
+
+exp = MyExperiment(project, "transformer_v1", {"lr": 0.001, "epochs": 100})
+results = exp()  # Logged to MLflow automatically
+```
 
 ## Key Features
 
-- **Simple Integration**: Subclass `Experiment`, implement `run()`, and you're done
-- **Automatic Tracking**: Configs and results automatically saved to SQLite database
-- **Powerful Queries**: Query by config values, time ranges, tags, or any custom field
-- **Schema Evolution**: Automatically adapts to new config parameters and result fields
-- **Flexible Tagging**: Tag and annotate runs for easy organization
-- **Hydra Compatible**: Works seamlessly with Hydra configs or plain Python dicts
-- **Local Storage**: No external dependencies, servers, or accounts needed
-- **Fast & Lightweight**: Pure Python with SQLite backend
-
-
-## What is wrong?
-
-Many researchers/students in technical or scientific fields need to develop and run a range of computational experiments. Many may not have a strong background in engineering software systems. The typical workflow involves writing ad-hoc Python scripts, running them with different parameters manually edited in the code or passed through command-line arguments, and saving results to variously named CSV files or folders. After weeks of exploration, researchers often find themselves with directories full of `experiment_v2_final_FINAL_actually_final.py` scripts and results scattered across `results_020124/`, `test_runs_new/`, and `backup_dont_delete/` folders. When it comes time to write up findings or revisit what worked, they're left grep-ing through code and opening dozens of files trying to remember which configuration produced that one promising result from three weeks ago.
-
-This ad-hoc approach leads scientific researchers to struggle with:
-- Forgetting which hyperparameters produced which results
-- Having to dive through folders upon folders of data and/or results
-- Not easy to find and compare runs across different properties
-- Reproducibility and code sharing
-- Existing solutions for experiment tracking require complex setup and are not that flexible
-- Forgetting which runs had the most important results or properties
-
-
-## What does SciWeave do?
-SciWeave solves these problems with a simple, local-first approach that grows with your research.
-
-SciWeave automatically creates and maintains a SQLite database for your entire project, where every experiment run is captured with its complete configuration and results. Instead of scattered files, you get an organized system that you can query with simple Python commands. Want to find all runs where accuracy exceeded 0.9? One line of code. Need to compare results across different learning rates? Simple filter. Looking for that experiment from last Tuesday with the specific parameter combination? It's all there, instantly searchable. You don't need to know SQL as SciWeave provides an intuitive Python API where you can filter by any parameter, query by time ranges, or retrieve results based on performance metrics.
-
-## What is an Experiment?
-
-At its core, any computational experiment—whether simulating particle interactions, optimizing portfolio allocations, or training neural networks—consists of three fundamental components. First, there's the **experimental logic**: the actual algorithmic steps, calculations, and procedures that test your hypothesis. Second, there's the **experimental conditions**: the parameters, configurations, and hyperparameters that define the specific context under which your experiment runs. Third, there's the **empirical results**: the measurements, metrics, and outcomes that your experiment produces.
-
-SciWeave's design philosophy directly maps to this trinity. Your experimental logic lives in an `Experiment` subclass where you implement the `run()` method with your scientific procedure. The experimental conditions are captured as a configuration dictionary that gets automatically tracked and made queryable. The results that you return as in the dictionary/JSON format will also get tracked and made queryable.
-
-SciWeave acknowledges that research is exploratory and adapts dynamically—adding new columns automatically when you introduce new parameters or metrics. 
-
-This separation of concerns means you focus on the science while SciWeave handles the bookkeeping, ensuring every run is recorded with its full context and outcomes.
+- **Simple Structure**: Subclass `Experiment`, implement `run()`, done
+- **MLflow Integration**: Configs logged as params, results as metrics
+- **Time-Series Metrics**: `self.log_metric("loss", value, step=epoch)` for training curves
+- **Artifact Storage**: `self.log_artifact("model.pt")` for models, plots, data
+- **Nested Configs**: `{"model": {"hidden": 256}}` flattened to `model.hidden` params
+- **Team Collaboration**: Everyone logs to the same Databricks/MLflow instance
+- **Agent-Friendly**: Gives AI coding agents a clear contract to follow
 
 ## Installation
 
 ```bash
 pip install sciweave
 
-# Or install from source
+# Or with uv
+uv pip install sciweave
+
+# Or from source
 git clone https://github.com/vivekhandebagh/sciweave.git
 cd sciweave
-pip install -e .
+uv pip install -e .
 ```
 
 ## Quick Start
 
-### Basic Usage
+### 1. Create a Project
 
 ```python
-import sciweave
-from sciweave import ProjectManager, Experiment
+from sciweave import Project, Experiment
 
-# Initialize project (creates/loads my_project.db)
-pm = ProjectManager("my_project")
+# Connect to Databricks MLflow
+project = Project("my-research", tracking_uri="databricks")
 
-# Define your experiment
-class MyExperiment(Experiment):
+# Or local MLflow server
+project = Project("my-research", tracking_uri="http://localhost:5000")
+
+# Or local file storage (for testing)
+project = Project("my-research", tracking_uri="./mlruns")
+```
+
+### 2. Define an Experiment
+
+```python
+class TrainingExperiment(Experiment):
     def run(self):
-        # Your experiment logic here
-        accuracy = train_model(self.config['learning_rate'])
-        return {"accuracy": accuracy, "loss": 0.23}
+        config = self.config  # Your nested config dict
 
-# Run experiment with config
+        model = build_model(config["model"])
+        optimizer = create_optimizer(model, config["training"])
+
+        for epoch in range(config["epochs"]):
+            loss = train_epoch(model, optimizer)
+            val_acc = evaluate(model)
+
+            # Log metrics with step for time-series
+            self.log_metric("train_loss", loss, step=epoch)
+            self.log_metric("val_accuracy", val_acc, step=epoch)
+
+        # Save model artifact
+        torch.save(model.state_dict(), "model.pt")
+        self.log_artifact("model.pt")
+
+        # Return final results (logged as metrics)
+        return {
+            "final_loss": loss,
+            "final_accuracy": val_acc,
+            "best_epoch": best_epoch
+        }
+```
+
+### 3. Run It
+
+```python
 config = {
-    "learning_rate": 0.001,
-    "batch_size": 32,
-    "model": "resnet18"
+    "model": {
+        "hidden_size": 256,
+        "num_layers": 4,
+        "dropout": 0.1
+    },
+    "training": {
+        "lr": 0.001,
+        "batch_size": 32
+    },
+    "epochs": 100
 }
 
-exp = MyExperiment(pm, "image_classification", config)
-results = exp()  # Automatically tracked in database
-```
-
-### Query Past Experiments
-
-```python
-# Find all runs with accuracy > 0.9
-good_runs = pm.query(
-    "image_classification",
-    filters={"accuracy": ">0.9"},
-    targets="all"  # Return all columns
+exp = TrainingExperiment(
+    project,
+    "transformer_experiment",
+    config,
+    run_name="baseline-v1",
+    tags={"team": "research", "version": "v1"}
 )
 
-# Get runs from last week
-recent = pm.query(
-    "image_classification", 
-    time_range="week"
+results = exp()
+print(f"Final accuracy: {results['final_accuracy']}")
+```
+
+## API Reference
+
+### Project
+
+```python
+Project(name: str, tracking_uri: str = "databricks")
+```
+
+- `name`: Project name (used as MLflow experiment prefix)
+- `tracking_uri`: MLflow tracking URI
+  - `"databricks"`: Use Databricks (requires `DATABRICKS_HOST` and `DATABRICKS_TOKEN` env vars)
+  - `"http://host:port"`: Remote MLflow server
+  - `"./path"`: Local file storage
+
+### Experiment
+
+```python
+Experiment(
+    project: Project,
+    experiment_name: str,
+    config: dict,
+    run_name: str = None,
+    tags: dict = None
+)
+```
+
+**Methods available in `run()`:**
+
+| Method | Description |
+|--------|-------------|
+| `self.config` | Access your config dict (original nested structure) |
+| `self.log_metric(key, value, step=None)` | Log a metric (use `step` for time-series) |
+| `self.log_metrics(dict, step=None)` | Log multiple metrics at once |
+| `self.log_artifact(path, artifact_path=None)` | Log a file (model, plot, data) |
+| `self.log_artifacts(dir, artifact_path=None)` | Log all files in a directory |
+| `self.log_figure(figure, filename)` | Log a matplotlib figure |
+| `self.log_dict(dict, filename)` | Log a dict as JSON/YAML |
+| `self.set_tag(key, value)` | Set a custom tag |
+| `self.run_id` | Get the current MLflow run ID |
+
+### Config Flattening
+
+Nested configs are automatically flattened for MLflow params:
+
+```python
+# Your config
+{
+    "model": {"hidden": 256, "layers": 4},
+    "lr": 0.001
+}
+
+# Logged as MLflow params
+{
+    "model.hidden": "256",
+    "model.layers": "4",
+    "lr": "0.001"
+}
+```
+
+## Databricks Setup
+
+1. Set environment variables:
+   ```bash
+   export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
+   export DATABRICKS_TOKEN="your-personal-access-token"
+   ```
+
+2. Use `tracking_uri="databricks"`:
+   ```python
+   project = Project("my-research", tracking_uri="databricks")
+   ```
+
+3. Experiments appear in your Databricks workspace under MLflow Experiments.
+
+## Local Development
+
+For local testing without Databricks:
+
+```bash
+# Start local MLflow server
+mlflow server --port 5000
+
+# In your code
+project = Project("my-research", tracking_uri="http://localhost:5000")
+```
+
+Or use file-based tracking:
+```python
+project = Project("my-research", tracking_uri="./mlruns")
+```
+
+## Querying Results
+
+Use MLflow's UI or API to query results:
+
+```python
+import mlflow
+
+# Set tracking URI
+mlflow.set_tracking_uri("databricks")
+
+# Search runs
+runs = mlflow.search_runs(
+    experiment_names=["my-research/transformer_experiment"],
+    filter_string="metrics.final_accuracy > 0.9"
 )
 
-# Find specific config
-specific = pm.query(
-    "image_classification",
-    filters={"learning_rate": 0.001, "model": "resnet18"}
+print(runs[["params.model.hidden", "metrics.final_accuracy"]])
+```
+
+Or use the MLflow UI at your Databricks workspace or `http://localhost:5000`.
+
+## For AI Coding Agents
+
+SciWeave gives AI agents a clear contract:
+
+1. Subclass `Experiment`
+2. Implement `run()` method
+3. Access config via `self.config`
+4. Log metrics with `self.log_metric()`
+5. Return results as a dict
+
+This structure prevents agents from creating ad-hoc scripts and ensures all experiments are tracked consistently.
+
+## Example: Full Training Pipeline
+
+```python
+from sciweave import Project, Experiment
+import torch
+import torch.nn as nn
+
+project = Project("nlp-research", tracking_uri="databricks")
+
+class LanguageModelExperiment(Experiment):
+    def run(self):
+        # Access nested config naturally
+        model_cfg = self.config["model"]
+        train_cfg = self.config["training"]
+
+        # Build model
+        model = TransformerLM(
+            vocab_size=model_cfg["vocab_size"],
+            d_model=model_cfg["d_model"],
+            n_heads=model_cfg["n_heads"],
+            n_layers=model_cfg["n_layers"]
+        )
+
+        optimizer = torch.optim.AdamW(model.parameters(), lr=train_cfg["lr"])
+
+        best_loss = float("inf")
+
+        for epoch in range(train_cfg["epochs"]):
+            # Training
+            train_loss = train_epoch(model, optimizer, train_loader)
+            val_loss = evaluate(model, val_loader)
+
+            # Log time-series metrics
+            self.log_metrics({
+                "train_loss": train_loss,
+                "val_loss": val_loss,
+                "learning_rate": optimizer.param_groups[0]["lr"]
+            }, step=epoch)
+
+            # Save best model
+            if val_loss < best_loss:
+                best_loss = val_loss
+                torch.save(model.state_dict(), "best_model.pt")
+                self.log_artifact("best_model.pt", "models")
+
+        # Log final model
+        torch.save(model.state_dict(), "final_model.pt")
+        self.log_artifact("final_model.pt", "models")
+
+        # Return final metrics
+        return {
+            "final_train_loss": train_loss,
+            "final_val_loss": val_loss,
+            "best_val_loss": best_loss,
+        }
+
+# Run experiment
+config = {
+    "model": {
+        "vocab_size": 50000,
+        "d_model": 512,
+        "n_heads": 8,
+        "n_layers": 6
+    },
+    "training": {
+        "lr": 1e-4,
+        "epochs": 50,
+        "batch_size": 32
+    }
+}
+
+exp = LanguageModelExperiment(
+    project,
+    "transformer_lm",
+    config,
+    run_name="baseline",
+    tags={"model_type": "transformer", "dataset": "wikitext"}
 )
+
+results = exp()
 ```
 
-### Advanced Features
+## Contributing
 
-```python
-# Tag your runs
-pm.add_tags("image_classification", run_id, ["baseline", "best"])
+Contributions welcome! This is an early release and we're actively looking for feedback.
 
-# Add notes
-pm.add_notes("image_classification", run_id, "This run used augmentation")
+## License
 
-# Get experiment summary
-summary = pm.get_experiment_summary("image_classification")
-print(f"Total runs: {summary['total_runs']}")
-print(f"Success rate: {summary['status_counts']['completed'] / summary['total_runs']}")
+MIT License
 
-# Find best runs
-best = pm.get_best_runs("image_classification", metric="accuracy", n=5)
-```
+## Status
 
-### Hydra Integration
+v0.2.0 - MLflow-first redesign. The API is stabilizing but may still change.
 
-```python
-import hydra
-from omegaconf import DictConfig
-
-@hydra.main(config_path="conf", config_name="config", version_base=None)
-def main(cfg: DictConfig):
-    pm = ProjectManager("my_project")
-    
-    class MyExperiment(Experiment):
-        def run(self):
-            # Access nested config naturally
-            model = create_model(self.original_config.model)
-            results = train(model, self.original_config.training)
-            return results
-    
-    exp = MyExperiment(pm, cfg.experiment.name, cfg)
-    exp()
-
-if __name__ == "__main__":
-    main()
-```
-
-## 🏗️ How It Works
-
-1. **ProjectManager** creates a SQLite database for your project
-2. Each **Experiment** gets its own table with automatic schema management
-3. Configs are flattened and stored as columns for easy querying
-4. Results are added as new columns dynamically
-5. Every run is tracked with metadata (timestamp, status, run_id)
-
-## 📊 Database Schema
-
-Each experiment table automatically includes:
-- `run_id`: Unique identifier for each run
-- `time_stamp`: When the run started
-- `experiment_name`: Name of the experiment
-- `run_status`: started/running/completed/failed
-- `mode`: dev/prod
-- `tags`: Comma-separated tags
-- `notes`: Free-form notes
-- Your config parameters as columns
-- Your result metrics as columns
-
-## 🔧 Configuration
-
-SciWeave works with:
-- Plain Python dictionaries
-- Nested dictionaries (automatically flattened)
-- Hydra/OmegaConf DictConfigs
-- Any JSON-serializable config
-
-## 📈 Experiment Evolution
-
-As your experiments evolve, SciWeave adapts:
-
-```python
-# First version - simple
-exp = MyExperiment(pm, "test", {"lr": 0.01})
-exp()  # Returns {"accuracy": 0.9}
-
-# Later - add more metrics without changing schema
-exp = MyExperiment(pm, "test", {"lr": 0.01, "momentum": 0.9})
-exp()  # Returns {"accuracy": 0.92, "f1_score": 0.91}
-# New columns automatically added!
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! This is an early release and we're actively looking for feedback.
-
-## 📝 License
-
-MIT License - see LICENSE file
-
-## 🚧 Status
-
-This is an early release (v0.1.0). The API may change in future versions. We recommend pinning your version for production use.
-
-## 🔮 Roadmap
-
-- [ ] Web dashboard for visualization
-- [ ] Export to common formats (CSV, Pandas, Weights & Biases)
-- [ ] Distributed experiment support
-- [ ] Artifact storage (models, plots)
-- [ ] Comparison tools
-- [ ] Statistical analysis utilities
-
-## 💬 Support
+## Support
 
 - Issues: [GitHub Issues](https://github.com/vivekhandebagh/sciweave/issues)
 - Discussions: [GitHub Discussions](https://github.com/vivekhandebagh/sciweave/discussions)
-
----
-
-Built with ❤️ for ML researchers who want simple, effective experiment tracking.
