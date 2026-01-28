@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "sciweave-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/Users/viveksimha/Projects/sciweave/sciweave-mcp", "run", "sciweave-mcp"],
+      "env": {
+        "MLFLOW_TRACKING_URI": "databricks",
+        "DATABRICKS_HOST": "https://dbc-6342f6a3-06cb.cloud.databricks.com",
+        "DATABRICKS_TOKEN": "dapi0a66a7230230abedf03f38901f37aa33"
+      }
+    }
+  }
+}
