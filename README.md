@@ -331,6 +331,66 @@ exp = LanguageModelExperiment(
 results = exp()
 ```
 
+## MCP Server for AI Agents
+
+SciWeave includes an MCP (Model Context Protocol) server that gives AI coding agents like Claude Code access to experiment management tools.
+
+### Quick Setup
+
+```bash
+cd sciweave-mcp
+uv sync
+```
+
+Add to `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "sciweave-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/sciweave-mcp", "run", "sciweave-mcp"],
+      "env": {
+        "MLFLOW_TRACKING_URI": "databricks",
+        "DATABRICKS_HOST": "https://your-workspace.cloud.databricks.com",
+        "DATABRICKS_TOKEN": "your-token",
+        "SCIWEAVE_VAULT_PATH": "/path/to/obsidian/vault",
+        "SCIWEAVE_WORKSPACE_PATH": "/path/to/workspace"
+      }
+    }
+  }
+}
+```
+
+### Available Tools (17 total)
+
+**MLflow Query (8 tools)**
+- `list_experiments` - List all experiments
+- `search_runs` - Search with filters
+- `get_run` - Get run details
+- `get_latest_run` - Get most recent run
+- `get_best_run` - Find best by metric
+- `get_metric_history` - Get training curves
+- `compare_runs` - Compare side-by-side
+- `list_artifacts` - List run artifacts
+
+**Vault (3 tools)** - Read experiment proposals from Obsidian
+- `vault_list_proposals` - List proposals
+- `vault_read_proposal` - Read full content
+- `vault_update_status` - Update status
+
+**Scaffold (2 tools)** - Generate experiment code
+- `scaffold_experiment` - Create boilerplate
+- `validate_experiment` - Check patterns
+
+**Journal (4 tools)** - Track runs
+- `journal_new_run` - Start new entry
+- `journal_append` - Add to section
+- `journal_update_status` - Update status
+- `journal_read` - Read journal
+
+See [sciweave-mcp/README.md](sciweave-mcp/README.md) for full documentation.
+
 ## Contributing
 
 Contributions welcome! This is an early release and we're actively looking for feedback.
@@ -341,7 +401,7 @@ MIT License
 
 ## Status
 
-v0.2.0 - MLflow-first redesign. The API is stabilizing but may still change.
+v0.2.0 - MLflow-first redesign with unified MCP server. The API is stabilizing but may still change.
 
 ## Support
 
