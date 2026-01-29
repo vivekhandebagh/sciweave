@@ -59,7 +59,7 @@ Single entry point providing 18 tools across 4 categories:
 | `compare_runs` | Compare runs side by side |
 | `list_artifacts` | List run artifacts |
 
-**Vault (3 tools)** - Read Hedorah proposals:
+**Vault (3 tools)** - Read Scigest proposals:
 | Tool | Purpose |
 |------|---------|
 | `vault_list_proposals` | List proposals from Obsidian |
@@ -83,7 +83,7 @@ Single entry point providing 18 tools across 4 categories:
 ### Data Flow
 
 ```
-Hedorah (paper processor)
+Scigest (paper processor)
     │
     ▼
 Obsidian Vault (proposals)

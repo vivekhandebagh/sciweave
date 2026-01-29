@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "sciweave-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/sciweave/sciweave-mcp", "run", "sciweave-mcp"],
+      "env": {
+        "MLFLOW_TRACKING_URI": "databricks",
+        "DATABRICKS_HOST": "https://your-workspace.cloud.databricks.com",
+        "DATABRICKS_TOKEN": "your-databricks-token",
+        "SCIWEAVE_VAULT_PATH": "/path/to/obsidian/vault/experiments",
+        "SCIWEAVE_WORKSPACE_PATH": "/path/to/workspace"
+      }
+    }
+  }
+}

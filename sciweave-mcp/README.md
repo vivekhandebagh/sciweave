@@ -98,7 +98,7 @@ Query experiment data from MLflow/Databricks.
 
 ### Vault Tools (3)
 
-Access experiment proposals from Obsidian vault (created by Hedorah or manually).
+Access experiment proposals from Obsidian vault (created by Scigest or manually).
 
 | Tool | Description |
 |------|-------------|

@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# MCP config (contains personal paths and tokens)
+.mcp.json
+
+# Environment files
+.env

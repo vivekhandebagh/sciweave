@@ -12,7 +12,7 @@
 - [x] **Artifact logging** - `self.log_artifact()`, `self.log_figure()`, etc.
 - [x] **Unified MCP server** - 17 tools in a single server
 - [x] **MLflow query tools** (8) - list_experiments, search_runs, get_run, get_latest_run, get_best_run, get_metric_history, compare_runs, list_artifacts
-- [x] **Vault tools** (3) - Access Hedorah proposals from Obsidian
+- [x] **Vault tools** (3) - Access Scigest proposals from Obsidian
 - [x] **Scaffold tools** (2) - Generate experiment boilerplate
 - [x] **Journal tools** (4) - Track runs with structured markdown
 
